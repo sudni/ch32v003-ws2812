@@ -1,0 +1,11 @@
+{
+    // Tell rust-analyzer to use the rustc defined by rust-toolchain.toml
+    "rust-analyzer.rustc.source": "discover",
+
+    // Suppress false-positive "can't find crate for `test`" on no_std targets
+    "rust-analyzer.diagnostics.disabled": ["E0463"],
+
+    "rust-analyzer.procMacro.enable": true,
+    // Disable checking for all targets (tests) natively on embedded projects
+    "rust-analyzer.cargo.allTargets": false
+}

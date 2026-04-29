@@ -1,0 +1,42 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "cwd": "${workspaceRoot}",
+            "executable": "${workspaceFolder}/target/riscv32ec-unknown-none-elf/debug/ch32v003-blinky",
+            "name": "Debug with OpenOCD (WCH-Link)",
+            "request": "launch",
+            "type": "cortex-debug",
+            "servertype": "openocd",
+            "configFiles": [
+                "interface/wch-link.cfg",
+                "target/ch32v003.cfg"
+            ],
+            "searchDir": [],
+            "runToEntryPoint": "main",
+            "showDevDebugOutput": "none"
+        },
+        {
+            "type": "probe-rs-debug",
+            "request": "launch",
+            "name": "Debug CH32V003",
+            "cwd": "${workspaceFolder}",
+            "connectUnderReset": false,
+            "chip": "CH32V003",
+            "flashingConfig": {
+                "flashingEnabled": true,
+                "haltAfterReset": true,
+            },
+            "coreConfigs": [
+                {
+                    "coreIndex": 0,
+                    "programBinary": "${workspaceFolder}/target/riscv32ec-unknown-none-elf/debug/ch32v003-blinky",
+                    "rttEnabled": false
+                }
+            ],
+            "env": {
+                "RUST_LOG": "info"
+            }
+        }
+    ]
+}

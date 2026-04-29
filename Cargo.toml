@@ -1,0 +1,30 @@
+[package]
+name = "ch32v003-blinky"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# HAL pour CH32V003
+ch32v0 = { version = "0.2.0", features = ["rt", "ch32v003", "critical-section"] }
+# Support du runtime pour QingKe (cœur RISC-V de WCH)
+qingke-rt = "0.1.9"
+qingke = { version = "0.1.9", features = ["critical-section-impl"] }
+# Gestion des pannes (panic halt)
+panic-halt = "0.2.0"
+# Support RISC-V générique
+riscv = "0.11.1"
+
+[profile.release]
+opt-level = "z"   # Optimiser la taille du code (critique pour 16KB Flash)
+lto = true        # Link Time Optimization
+codegen-units = 1 # Une seule unité de génération pour meilleure optimisation
+debug = true
+
+[profile.dev]
+opt-level = "z" # Dev aussi optimisé en taille
+
+[[bin]]
+name = "ch32v003-blinky"
+path = "src/main.rs"
+test = false
+bench = false
