@@ -38,15 +38,19 @@ Protocol: 4-wire SPI — **SCK, MOSI, CS, DC**.
 
 ---
 
-## Pixel write sequence
+## Pixel write sequence (Instant Reveal Pattern)
+
+To avoid seeing the screen draw row-by-row, the display can be temporarily turned off before sending pixels.
 
 ```
+CMD 0x28 → display OFF
 CMD 0x2A → column window (4 bytes)
 CMD 0x2B → row window    (4 bytes)
 CMD 0x2C → begin pixel stream
 DC HIGH, CS LOW
   [send N × 2 bytes RGB565 MSB-first via SPI/DMA]
 CS HIGH
+CMD 0x29 → display ON
 ```
 
 ## RGB565 colour table

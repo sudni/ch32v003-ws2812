@@ -27,22 +27,32 @@ main()
   │     └─ Display ON (0x29)
   │
   └─ 5. Main loop
-        └─ tft_fill_dma(color)   ← repeated every 500 ms, cycling 4 colors
+        └─ tft_fill_dma(color)   ← repeated every 100 ms, cycling 8 colors
+              ├─ Turn Display OFF (0x28) to hide drawing
               ├─ Set window (0x2A / 0x2B / 0x2C)
-              ├─ Fill ROW_BUF[480] with RGB565 big-endian bytes
-              └─ For each of 320 rows → spi_dma_tx(ROW_BUF)
-```
+              ├─ Switch SPI to 16-bit frames (DFF=1)
+              ├─ For each of 320 rows → spi_dma_fill16(&PIXEL)
+              ├─ Restore SPI to 8-bit frames (DFF=0)
+              └─ Turn Display ON (0x29) for instant reveal
+
+## Project Structure
+
+The codebase is split into specific modules for modularity and maintainability:
+
+- `src/main.rs`: Entry point, clock setup, GPIO config, SPI init, and the main draw loop.
+- `src/ili9341.rs`: TFT control pins (`cs`, `dc`, `rst`), init sequence, and `tft_fill_dma`.
+- `src/spi.rs`: SPI and DMA-specific functions (`spi_dma_tx`, `spi_dma_fill16`, `spi_tx_byte`).
+- `src/delay.rs`: Low-level busy-wait delay functions (`delay_us`, `delay_ms`).
 
 ## Module overview
 
 | Function | Role | Transfer method |
 |----------|------|-----------------|
 | `spi_tx_byte()` | Send 1 byte (polling) | Blocking / no DMA |
-| `tft_cmd()` | Send command byte | Blocking |
-| `tft_data()` | Send data byte | Blocking |
-| `tft_cmd_data()` | Send command + N data bytes | Blocking |
-| `tft_init()` | ILI9341 init sequence | Blocking |
 | `spi_dma_tx()` | Send N bytes via DMA1 Ch3 | DMA + poll TC flag |
+| `spi_dma_fill16()` | Send repeating 16-bit word | DMA (MINC=0) |
+| `tft_cmd()`, `tft_data()` | Send command / data byte | Blocking |
+| `tft_init()` | ILI9341 init sequence | Blocking |
 | `tft_fill_dma()` | Fill full screen, row by row | DMA |
 
 ## DMA transfer sequence (`spi_dma_tx`)
@@ -63,9 +73,9 @@ main()
 The CH32V003 has only **2 KB of RAM**.  
 A full 240×320 RGB565 framebuffer would require **153 600 bytes** — 75× more than available.
 
-Instead, a single 480-byte row tile (`static mut ROW_BUF`) is filled once per unique colour  
-and then DMA'd 320 times. For arbitrary pixel-level graphics, the window would be set  
-to individual tiles or lines before each DMA burst.
+Instead, a single 2-byte pixel variable (`static mut PIXEL: u16`) is used with DMA `MINC=0` (fixed memory address increment) and 16-bit transfers to fill the screen without any row buffers. This provides a minimal memory footprint while still getting the speed benefits of DMA.
+
+To hide the drawing process, the display is temporarily turned off (`0x28`) and turned back on (`0x29`) when the fill is complete.
 
 ## Timing estimates
 
