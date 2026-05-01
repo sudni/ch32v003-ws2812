@@ -61,9 +61,12 @@ fn pin_clr(outdr: *mut u32, bit: u8) {
     unsafe { ptr::write_volatile(outdr, ptr::read_volatile(outdr) & !(1u32 << bit)) };
 }
 
-// ── DMA transfer (blocking, poll TC flag) ────────────────────────────────────
-/// Send `len` bytes from `buf` over SPI1 using DMA1 Channel 3.
+// ── DMA helpers ───────────────────────────────────────────────────────────────
+
+/// Send `len` **bytes** from `buf` over SPI1 via DMA1 Ch3 (8-bit, MINC=1).
+/// Used for command argument payloads where every byte differs.
 /// Caller must assert CS and set DC beforehand.
+#[allow(dead_code)]
 fn spi_dma_tx(p: &Peripherals, buf: &[u8]) {
     if buf.is_empty() {
         return;
@@ -83,7 +86,7 @@ fn spi_dma_tx(p: &Peripherals, buf: &[u8]) {
     dma.maddr3()
         .write(|w| unsafe { w.bits(buf.as_ptr() as u32) });
 
-    // Transfer count
+    // Transfer count (bytes)
     dma.cntr3().write(|w| unsafe { w.bits(buf.len() as u32) });
 
     // Configure channel:
@@ -93,7 +96,6 @@ fn spi_dma_tx(p: &Peripherals, buf: &[u8]) {
     //   PSIZE=00 (8-bit)  MSIZE=00 (8-bit)
     //   PL=10   high priority
     //   CIRC=0  one-shot
-    //   EN=1    enable
     dma.cfgr3().write(|w| unsafe {
         w.dir()
             .set_bit() // mem→periph
@@ -105,6 +107,72 @@ fn spi_dma_tx(p: &Peripherals, buf: &[u8]) {
             .bits(0b00) // 8-bit peripheral
             .msize()
             .bits(0b00) // 8-bit memory
+            .pl()
+            .bits(0b10) // high priority
+            .circ()
+            .clear_bit()
+            .mem2mem()
+            .clear_bit()
+            .en()
+            .set_bit()
+    });
+
+    // Wait for transfer complete (TC flag = bit 9 of INTFR)
+    while p.DMA1.intfr().read().bits() & (1 << 9) == 0 {}
+
+    // Wait until SPI is not busy before deasserting CS
+    while p.SPI1.statr().read().bsy().bit_is_set() {}
+}
+
+/// Repeat a single **16-bit** pixel value `count` times over SPI1 via DMA1 Ch3.
+///
+/// Key differences from `spi_dma_tx`:
+///   - PSIZE = MSIZE = 01  → 16-bit transfers (SPI DFF must be 1)
+///   - MINC  = 0           → DMA reads the *same* memory address every time
+///
+/// This lets us fill the whole screen from a single `u16` without any buffer.
+/// The SPI peripheral must already be configured for 16-bit frames (DFF=1)
+/// before calling this, and restored to 8-bit afterwards.
+/// Caller must assert CS and set DC=data beforehand.
+fn spi_dma_fill16(p: &Peripherals, pixel: *const u16, count: u32) {
+    if count == 0 {
+        return;
+    }
+    let dma = &p.DMA1;
+
+    // Disable channel before reconfiguring
+    dma.cfgr3().modify(|_, w| w.en().clear_bit());
+
+    // Clear all interrupt flags for ch3
+    dma.intfcr().write(|w| unsafe { w.bits(0x0F00) });
+
+    // Peripheral address → SPI1 data register
+    dma.paddr3().write(|w| unsafe { w.bits(SPI1_DATAR) });
+
+    // Memory address → the single pixel variable
+    dma.maddr3().write(|w| unsafe { w.bits(pixel as u32) });
+
+    // Transfer count (number of 16-bit words)
+    dma.cntr3().write(|w| unsafe { w.bits(count) });
+
+    // Configure channel:
+    //   DIR=1   memory→peripheral
+    //   MINC=0  fixed source address (repeat same pixel)
+    //   PINC=0  peripheral address fixed
+    //   PSIZE=01 (16-bit)  MSIZE=01 (16-bit)
+    //   PL=10   high priority
+    //   CIRC=0  one-shot
+    dma.cfgr3().write(|w| unsafe {
+        w.dir()
+            .set_bit() // mem→periph
+            .minc()
+            .clear_bit() // ← fixed: no memory increment
+            .pinc()
+            .clear_bit()
+            .psize()
+            .bits(0b01) // 16-bit peripheral
+            .msize()
+            .bits(0b01) // 16-bit memory
             .pl()
             .bits(0b10) // high priority
             .circ()
@@ -221,11 +289,18 @@ fn tft_init(p: &Peripherals) {
 
 // ── Fill screen with a solid RGB565 colour using DMA ─────────────────────────
 //
-// To avoid allocating a 153 600-byte framebuffer in 2 KB of RAM we stream
-// a small tile buffer row by row via DMA.
+// Optimised for minimum RAM usage:
+//   • A single `static mut PIXEL: u16` holds the colour (2 bytes, not 480).
+//   • DMA is configured in 16-bit mode with MINC=0 so it reads the same
+//     address 76 800 times (WIDTH × HEIGHT), sending every pixel in one shot.
+//   • SPI is temporarily switched to 16-bit frame mode (DFF=1) for the fill,
+//     then restored to 8-bit afterwards.
 //
-// Tile size: 240 pixels × 2 bytes = 480 bytes – fits comfortably.
+// RAM saved vs. the old ROW_BUF approach: 480 − 2 = 478 bytes.
 fn tft_fill_dma(p: &Peripherals, color: u16) {
+    // Turn display OFF to hide the drawing process
+    tft_cmd(p, 0x28);
+
     // Set write window to full screen
     tft_cmd_data(p, 0x2A, &[0x00, 0x00, 0x00, 0xEF]); // column 0-239
     tft_cmd_data(p, 0x2B, &[0x00, 0x00, 0x01, 0x3F]); // row 0-319
@@ -233,26 +308,29 @@ fn tft_fill_dma(p: &Peripherals, color: u16) {
     // Begin pixel write
     tft_cmd(p, 0x2C);
 
-    // Build a one-row tile (240 RGB565 pixels = 480 bytes)
-    // We keep this as a `static mut` to avoid consuming stack in the tiny 2 KB RAM.
-    static mut ROW_BUF: [u8; (WIDTH as usize) * 2] = [0u8; (WIDTH as usize) * 2];
+    // Single pixel source – only 2 bytes of RAM needed.
+    // `static mut` keeps it out of the stack (critical in 2 KB RAM).
+    static mut PIXEL: u16 = 0;
 
-    let hi = (color >> 8) as u8;
-    let lo = (color & 0xFF) as u8;
-    unsafe {
-        for i in 0..(WIDTH as usize) {
-            ROW_BUF[i * 2] = hi;
-            ROW_BUF[i * 2 + 1] = lo;
-        }
-    }
+    // Switch SPI to 16-bit frame mode for the fill transfer
+    p.SPI1.ctlr1().modify(|_, w| w.dff().set_bit());
 
-    // Send HEIGHT rows via DMA
+    // Stream pixels in row-sized chunks to avoid the 16-bit DMA counter limit
     dc_data();
     cs_low();
-    for _ in 0..HEIGHT {
-        unsafe { spi_dma_tx(p, &*(&raw const ROW_BUF)) };
+    unsafe {
+        PIXEL = color;
+        for _ in 0..HEIGHT {
+            spi_dma_fill16(p, &raw const PIXEL, WIDTH as u32);
+        }
     }
     cs_high();
+
+    // Restore SPI to 8-bit frame mode for subsequent commands
+    p.SPI1.ctlr1().modify(|_, w| w.dff().clear_bit());
+
+    // Turn display ON to reveal the updated screen instantly
+    tft_cmd(p, 0x29);
 }
 
 // =============================================================================

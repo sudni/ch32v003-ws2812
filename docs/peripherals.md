@@ -104,9 +104,9 @@
 |--------|------|-------|-------------|
 | 14 | `MEM2MEM` | `0` | Peripheral ↔ memory mode |
 | 13:12 | `PL[1:0]` | `10` | High priority |
-| 11:10 | `MSIZE[1:0]` | `00` | Memory data width = 8-bit |
-| 9:8 | `PSIZE[1:0]` | `00` | Peripheral data width = 8-bit |
-| 7 | `MINC` | `1` | Memory address auto-increment |
+| 11:10 | `MSIZE[1:0]` | `00` | Memory data width = 8-bit (`01` for 16-bit fills) |
+| 9:8 | `PSIZE[1:0]` | `00` | Peripheral data width = 8-bit (`01` for 16-bit fills) |
+| 7 | `MINC` | `1` | Memory address auto-increment (`0` to repeat single value) |
 | 6 | `PINC` | `0` | Peripheral address fixed |
 | 5 | `CIRC` | `0` | One-shot (no circular mode) |
 | 4 | `DIR` | `1` | Direction: memory → peripheral |
@@ -117,8 +117,9 @@
 
 ### DMA1_CNTR3 — Channel 3 Transfer Count
 
-- Set to `buf.len()` before enabling channel.
+- Set to `buf.len()` (or element count for 16-bit mode) before enabling channel.
 - Counts down to 0; channel auto-disables when done.
+- **Important:** This is a 16-bit register! Maximum value is `65,535`. A full screen transfer (`240×320 = 76,800`) will overflow this counter. Send data in chunks (e.g., row-by-row) to avoid truncation.
 
 ### DMA1_PADDR3 — Channel 3 Peripheral Address
 

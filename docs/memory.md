@@ -38,22 +38,22 @@ Region aliases map standard `REGION_*` symbols used by the `riscv-rt` linker scr
 | Symbol | Location | Size | Description |
 |--------|----------|------|-------------|
 | `.bss` / `.data` | RAM | < 100 B | Globals, Peripherals token |
-| `ROW_BUF` (static mut) | RAM (.bss) | **480 B** | One row tile: 240 px × 2 bytes |
+| `PIXEL` (static mut) | RAM (.bss) | **2 B** | Single pixel for DMA fills |
 | Stack | RAM (top) | up to ~1.5 KB | Call stack |
 
-### Why `ROW_BUF` is `static mut`
+### How we removed `ROW_BUF` (saving 480 B)
 
 A full framebuffer (240×320×2 = **153 600 B**) is impossible in 2 KB.  
-A stack-allocated row buffer (480 B) would consume 25% of total RAM every function call.  
-Using `static mut` places it in `.bss` (zero-initialised at startup), persistent across calls, with zero stack cost.
+Previously, a stack or static allocated row buffer (480 B) consumed 25% of total RAM.
+We optimised this by declaring a single `static mut PIXEL: u16` and configuring DMA in 16-bit mode with `MINC=0` (no memory increment). DMA streams the same 2-byte memory address over and over to the SPI peripheral!
 
 ### RAM budget summary
 
 ```
 Total RAM:     2048 B
-ROW_BUF:       - 480 B   (static, .bss)
+PIXEL:         -   2 B   (static, .bss)
 BSS/DATA:      -  ~64 B  (runtime data)
-Available stack: ~1504 B  ✓  (sufficient for single call frame, no recursion)
+Available stack: ~1982 B  ✓  (sufficient for single call frame, no recursion)
 ```
 
 ---
@@ -71,12 +71,12 @@ Measured section sizes (`cargo size --release -- -A`):
 |---------|------|---------|-------------|
 | `.init` | 4 B | `0x0000_0000` | Reset vector |
 | `.trap` | 240 B | `0x0000_0004` | Interrupt vector table |
-| `.text` | 1 082 B | `0x0000_00F4` | Firmware code |
-| `.rodata` | 168 B | `0x0000_0530` | Read-only data (constants) |
+| `.text` | ~1 082 B | `0x0000_00F4` | Firmware code |
+| `.rodata` | ~168 B | `0x0000_0530` | Read-only data (constants) |
 | `.data` | 0 B | `0x2000_0000` | Initialised globals |
-| `.bss` | **481 B** | `0x2000_0000` | Zero-init globals (incl. ROW_BUF) |
+| `.bss` | **~3 B** | `0x2000_0000` | Zero-init globals (incl. PIXEL) |
 | **Total Flash** | **~1.7 KB** | | of 16 KB available ✅ |
-| **Total RAM** | **481 B** | | of 2 048 B available ✅ |
+| **Total RAM** | **~3 B** | | of 2 048 B available ✅ |
 
 > Debug symbols (`.debug_*`) add ~63 KB to the ELF file but are **not** flashed — they exist for GDB only.
 
