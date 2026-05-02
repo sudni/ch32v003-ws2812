@@ -55,6 +55,8 @@ cargo build
 cargo build --release
 ```
 
+> **Tip:** In VS Code, you can simply press **Ctrl+Shift+B** to run the default build task.
+
 The binary is placed at:
 ```
 target/riscv32ec-unknown-none-elf/debug/ch32v003-blinky
@@ -140,9 +142,15 @@ riscv32-unknown-elf-gdb target/riscv32ec-unknown-none-elf/debug/ch32v003-blinky 
   -ex "monitor reset halt"
 ```
 
-### 3. VS Code
+### 3. VS Code (Recommended)
 
-Use the `.vscode/` configuration already present in the project (if configured with `cortex-debug` or `probe-rs`).
+The project is pre-configured for VS Code with the following:
+- **Build Task**: `Ctrl+Shift+B` runs `cargo build`.
+- **Debug Profiles**: Press `F5` to start debugging.
+  - **"Debug with wlink"**: Recommended for WCH-Link.
+  - **"Debug with OpenOCD"**: Traditional OpenOCD path.
+- **Extensions**: Requires `Cortex-Debug` and/or `probe-rs`.
+- **Register Viewing**: `ch32v003.svd` is provided for inspecting peripheral registers.
 
 ---
 

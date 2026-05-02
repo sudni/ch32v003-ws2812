@@ -1,7 +1,7 @@
 # CH32V003 — TFT SPI Display with DMA
 
 Bare-metal Rust project driving a **QVGA 2.2″ TFT SPI 240×320** display  
-from a **WCH CH32V003** RISC-V microcontroller using **SPI1 + DMA1** for fast pixel transfers.
+from a **WCH CH32V003** RISC-V microcontroller at **48 MHz**, using **SPI1 + DMA1** with optimized chunking for fast pixel transfers.
 
 ## Documentation index
 
@@ -28,10 +28,11 @@ wlink flash target/riscv32ec-unknown-none-elf/release/ch32v003-blinky
 ## Project overview
 
 ```
-ch32v003-ws2812/
+ch32v003-ili9341/
 ├── src/
 │   ├── main.rs               # Main entry point and initialization
 │   ├── ili9341.rs            # TFT display driver and DMA fill routines
+│   ├── backlight.rs          # Backlight PWM control (TIM1)
 │   ├── spi.rs                # SPI configuration and DMA transfers
 │   └── delay.rs              # Busy-wait timing utilities
 ├── docs/                     # This documentation

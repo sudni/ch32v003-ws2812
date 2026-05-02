@@ -6,6 +6,7 @@
 |-----|----------|-----|------------|
 | AHB | `RCC.AHBPCENR` | `DMA1EN` | DMA1 controller |
 | APB2 | `RCC.APB2PCENR` | `SPI1EN` | SPI1 |
+| APB2 | `RCC.APB2PCENR` | `TIM1EN` | TIM1 Timer |
 | APB2 | `RCC.APB2PCENR` | `IOPCEN` | GPIOC |
 | APB2 | `RCC.APB2PCENR` | `IOPDEN` | GPIOD |
 | APB2 | `RCC.APB2PCENR` | `AFIOEN` | Alternate Function I/O |
@@ -26,6 +27,7 @@
 
 | Pin | Bit field | MODE | CNF | Mode description |
 |-----|-----------|------|-----|-----------------|
+| PD2 (PWM) | `cnf2`, `mode2` | `11` | `10` | AF push-pull, 50 MHz (TIM1_CH1) |
 | PD3 (DC) | `cnf3`, `mode3` | `01` | `00` | GP Output push-pull, 10 MHz |
 | PD4 (RST) | `cnf4`, `mode4` | `01` | `00` | GP Output push-pull, 10 MHz |
 
@@ -143,6 +145,35 @@
 
 ---
 
+## TIM1 — Advanced-Control Timer (PWM)
+
+**Base address:** `0x4001_2C00`
+
+Used to generate a 10 kHz PWM signal on **PD2** for backlight dimming.
+
+### TIM1_PSC — Prescaler
+- Set to `47`. Counter clock = 48 MHz / (47 + 1) = **1 MHz**.
+
+### TIM1_ATRLR — Auto-Reload Register
+- Set to `100`. PWM frequency = 1 MHz / 100 = **10 kHz**.
+
+### TIM1_CH1CVR — Capture/Compare Register 1
+- Controls the duty cycle on **PD2**.
+- Value `0` = 0% brightness (off).
+- Value `100` = 100% brightness (on).
+
+### TIM1_CHCTLR1 — Channel Control Register 1
+- `OC1M` = `0b110`: PWM mode 1.
+- `OC1PE` = `1`: Preload enable.
+
+### TIM1_BDTR — Break and Dead-Time Register
+- `MOE` = `1`: **Main Output Enable**. Must be set for TIM1 outputs to function.
+
+### TIM1_CTLR1 — Control Register 1
+- `CEN` = `1`: Counter enable.
+
+---
+
 ## Memory map summary
 
 | Peripheral | Base Address |
@@ -153,3 +184,4 @@
 | GPIOD | `0x4001_1400` |
 | AFIO | `0x4001_0000` |
 | SPI1 | `0x4001_3000` |
+| TIM1 | `0x4001_2C00` |

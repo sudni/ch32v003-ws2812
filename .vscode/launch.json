@@ -7,22 +7,55 @@
             "name": "Debug with OpenOCD (WCH-Link)",
             "request": "launch",
             "type": "cortex-debug",
+            "preLaunchTask": "rust: build",
             "servertype": "openocd",
             "configFiles": [
                 "interface/wch-link.cfg",
                 "target/ch32v003.cfg"
             ],
+            "svdFile": "${workspaceRoot}/ch32v003.svd",
+            "gdbPath": "riscv-none-elf-gdb",
             "searchDir": [],
             "runToEntryPoint": "main",
             "showDevDebugOutput": "none"
         },
         {
+            "cwd": "${workspaceRoot}",
+            "executable": "${workspaceFolder}/target/riscv32ec-unknown-none-elf/debug/ch32v003-blinky",
+            "name": "Debug with wlink",
+            "request": "launch",
+            "type": "cortex-debug",
+            "preLaunchTask": "rust: build",
+            "servertype": "external",
+            "gdbTarget": "localhost:3333",
+            "gdbPath": "riscv-none-elf-gdb",
+            "runToEntryPoint": "main",
+            "svdFile": "${workspaceRoot}/ch32v003.svd",
+            "preLaunchCommands": [
+                "shell wlink --chip CH32V003 gdb-server \u0026",
+                "shell sleep 1"
+            ],
+            "postRestartCommands": [
+                "shell pkill wlink || true",
+                "shell wlink --chip CH32V003 gdb-server \u0026",
+                "shell sleep 1"
+            ],
+            "overrideRestartCommands": [
+                "monitor reset",
+                "load",
+                "tbreak main",
+                "continue"
+            ]
+        },
+        {
             "type": "probe-rs-debug",
             "request": "launch",
             "name": "Debug CH32V003",
+            "preLaunchTask": "rust: build",
             "cwd": "${workspaceFolder}",
             "connectUnderReset": false,
             "chip": "CH32V003",
+            "svdFile": "${workspaceFolder}/ch32v003.svd",
             "flashingConfig": {
                 "flashingEnabled": true,
                 "haltAfterReset": true,

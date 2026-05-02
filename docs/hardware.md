@@ -15,7 +15,7 @@
 | **DC/RS** | **PD3** | OUT | Push-pull 10 MHz | Data/Command select (HIGH=data, LOW=command) |
 | **SDI/MOSI** | **PC6** | OUT | AF push-pull 50 MHz | SPI1 MOSI |
 | **SCK** | **PC5** | OUT | AF push-pull 50 MHz | SPI1 clock |
-| **LED** | 3.3 V (or PWM) | — | — | Backlight LED anode (add 10–33 Ω series resistor) |
+| **LED** | **PD2** | OUT | AF push-pull 50 MHz | Backlight PWM (TIM1_CH1) |
 | **SDO/MISO** | NC | — | — | Not connected (write-only driver) |
 
 > **Note:** The QVGA 2.2″ module has a 9-pin header.  
@@ -27,8 +27,9 @@
 |----------|---------|---------|
 | GPIOC CFGLR | `0x4001_1000` | Configure PC1/PC5/PC6 modes |
 | GPIOC OUTDR | `0x4001_100C` | Drive PC1 (CS) high/low |
-| GPIOD CFGLR | `0x4001_1400` | Configure PD3/PD4 modes |
+| GPIOD CFGLR | `0x4001_1400` | Configure PD2/PD3/PD4 modes |
 | GPIOD OUTDR | `0x4001_140C` | Drive PD3 (DC) and PD4 (RST) |
+| TIM1 CH1CVR | `0x4001_2C34` | Backlight PWM duty cycle (PD2) |
 
 ## CH32V003 package pinout reference (TSSOP20 / SOP16)
 
@@ -43,7 +44,7 @@
      PA2       ──┤ 6     15 ├── PC3
      VSS (GND) ──┤ 7     14 ├── PC4
      PD1/SWDIO ──┤ 8     13 ├── PD0
-     PD2       ──┤ 9     12 ├── VDD (3.3V)
+     PD2 (LED) ──┤ 9     12 ├── VDD (3.3V)
      PD3 (DC)  ──┤ 10    11 ├── PA1
                  └──────────┘
 ```
@@ -51,6 +52,7 @@
 
 ## Electrical considerations
 
+- **Clock source:** A 24 MHz external crystal (X1) is required to achieve the 48 MHz system clock (via x2 PLL multiplier).
 - **Supply voltage:** 3.3 V strictly. The CH32V003 I/O is 3.3 V; most TFT modules accept 3.3 V directly.
 - **SPI clock speed:** Set to 24 MHz (fPCLK/2). ILI9341 max write clock = 25 MHz.
 - **Series resistor on MOSI/SCK:** Optional 22–33 Ω to reduce ringing on long wires.
@@ -66,5 +68,5 @@
 - [ ] DC  → PD3
 - [ ] MOSI → PC6
 - [ ] SCK → PC5
-- [ ] LED → 3.3 V (with series resistor)
+- [ ] LED → PD2 (PWM, with series resistor)
 - [ ] MISO → NC (leave unconnected)

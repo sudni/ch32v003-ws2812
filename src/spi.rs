@@ -60,9 +60,6 @@ pub fn spi_dma_tx(p: &Peripherals, buf: &[u8]) {
 
     // Wait for transfer complete (TC flag = bit 9 of INTFR)
     while p.DMA1.intfr().read().bits() & (1 << 9) == 0 {}
-
-    // Wait until SPI is not busy before deasserting CS
-    while p.SPI1.statr().read().bsy().bit_is_set() {}
 }
 
 /// Repeat a single **16-bit** pixel value `count` times over SPI1 via DMA1 Ch3.
@@ -126,9 +123,6 @@ pub fn spi_dma_fill16(p: &Peripherals, pixel: *const u16, count: u32) {
 
     // Wait for transfer complete (TC flag = bit 9 of INTFR)
     while p.DMA1.intfr().read().bits() & (1 << 9) == 0 {}
-
-    // Wait until SPI is not busy before deasserting CS
-    while p.SPI1.statr().read().bsy().bit_is_set() {}
 }
 
 // ── Low-level SPI (blocking, no DMA) for short commands ──────────────────────

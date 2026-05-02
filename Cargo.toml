@@ -22,6 +22,7 @@ debug = true
 
 [profile.dev]
 opt-level = "z" # Dev aussi optimisé en taille
+debug = true
 
 [[bin]]
 name = "ch32v003-blinky"

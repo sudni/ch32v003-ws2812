@@ -1,7 +1,8 @@
+use crate::delay::delay_ms;
+
+use crate::spi::{spi_dma_fill16, spi_tx_byte};
 use ch32v0::ch32v003::Peripherals;
 use core::ptr;
-use crate::spi::{spi_tx_byte, spi_dma_fill16};
-use crate::delay::delay_ms;
 
 // Screen resolution
 pub const WIDTH: u16 = 240;
@@ -108,9 +109,6 @@ pub fn tft_init(p: &Peripherals) {
 
 // ── Fill screen with a solid RGB565 colour using DMA ─────────────────────────
 pub fn tft_fill_dma(p: &Peripherals, color: u16) {
-    // Turn display OFF to hide the drawing process
-    tft_cmd(p, 0x28);
-
     // Set write window to full screen
     tft_cmd_data(p, 0x2A, &[0x00, 0x00, 0x00, 0xEF]); // column 0-239
     tft_cmd_data(p, 0x2B, &[0x00, 0x00, 0x01, 0x3F]); // row 0-319
@@ -130,15 +128,16 @@ pub fn tft_fill_dma(p: &Peripherals, color: u16) {
     cs_low();
     unsafe {
         PIXEL = color;
-        for _ in 0..HEIGHT {
-            spi_dma_fill16(p, &raw const PIXEL, WIDTH as u32);
-        }
+        // Two large bursts to fit within 16-bit DMA counter (max 65535)
+        const CHUNK_SIZE: u32 = (WIDTH as u32 * HEIGHT as u32) / 2;
+        spi_dma_fill16(p, &raw const PIXEL, CHUNK_SIZE);
+        spi_dma_fill16(p, &raw const PIXEL, CHUNK_SIZE);
+
+        // Wait until SPI is not busy before deasserting CS
+        while p.SPI1.statr().read().bsy().bit_is_set() {}
     }
     cs_high();
 
     // Restore SPI to 8-bit frame mode for subsequent commands
     p.SPI1.ctlr1().modify(|_, w| w.dff().clear_bit());
-
-    // Turn display ON to reveal the updated screen instantly
-    tft_cmd(p, 0x29);
 }
