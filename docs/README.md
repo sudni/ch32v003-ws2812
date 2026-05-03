@@ -13,6 +13,7 @@ from a **WCH CH32V003** RISC-V microcontroller at **48 MHz**, using **SPI1 + DMA
 | [tft_protocol.md](tft_protocol.md) | ILI9341/ST7789 command reference used |
 | [build_flash.md](build_flash.md) | Toolchain setup, build & flash instructions |
 | [memory.md](memory.md) | Memory layout & RAM usage analysis |
+| [demo.md](demo.md) | Details of the C64 and Plasma demo effects |
 
 ## Quick start
 
@@ -31,9 +32,12 @@ wlink flash target/riscv32ec-unknown-none-elf/release/ch32v003-blinky
 ch32v003-ili9341/
 ├── src/
 │   ├── main.rs               # Main entry point and initialization
-│   ├── ili9341.rs            # TFT display driver and DMA fill routines
+│   ├── demo.rs               # Demo scenes (Starfield, Plasma, Scroller)
+│   ├── ili9341.rs            # TFT display driver and primitives
 │   ├── backlight.rs          # Backlight PWM control (TIM1)
 │   ├── spi.rs                # SPI configuration and DMA transfers
+│   ├── assets.rs             # Sprites and graphical assets
+│   ├── font.rs               # Bitmap font data
 │   └── delay.rs              # Busy-wait timing utilities
 ├── docs/                     # This documentation
 ├── Cargo.toml

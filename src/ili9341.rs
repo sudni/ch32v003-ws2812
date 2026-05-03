@@ -1,6 +1,6 @@
 use crate::delay::delay_ms;
 
-use crate::spi::{spi_dma_fill16, spi_dma_tx, spi_tx_byte};
+use crate::spi::{spi_dma_tx, spi_tx_byte};
 use ch32v0::ch32v003::Peripherals;
 use core::ptr;
 
@@ -116,30 +116,19 @@ pub fn tft_fill_dma(p: &Peripherals, color: u16) {
     // Begin pixel write
     tft_cmd(p, 0x2C);
 
-    // Single pixel source – only 2 bytes of RAM needed.
-    // `static mut` keeps it out of the stack (critical in 2 KB RAM).
-    static mut PIXEL: u16 = 0;
+    // Single pixel source (converted to 2 bytes)
+    let color_high = (color >> 8) as u8;
+    let color_low = (color & 0xFF) as u8;
 
-    // Switch SPI to 16-bit frame mode for the fill transfer
-    p.SPI1.ctlr1().modify(|_, w| w.dff().set_bit());
-
-    // Stream pixels in row-sized chunks to avoid the 16-bit DMA counter limit
     dc_data();
     cs_low();
-    unsafe {
-        PIXEL = color;
-        // Two large bursts to fit within 16-bit DMA counter (max 65535)
-        const CHUNK_SIZE: u32 = (WIDTH as u32 * HEIGHT as u32) / 2;
-        spi_dma_fill16(p, &raw const PIXEL, CHUNK_SIZE);
-        spi_dma_fill16(p, &raw const PIXEL, CHUNK_SIZE);
-
-        // Wait until SPI is not busy before deasserting CS
-        while p.SPI1.statr().read().bsy().bit_is_set() {}
+    // Stream pixels in row-sized chunks
+    const CHUNK_COUNT: u32 = WIDTH as u32 * HEIGHT as u32;
+    for _ in 0..CHUNK_COUNT {
+        crate::spi::spi_tx_byte(p, color_high);
+        crate::spi::spi_tx_byte(p, color_low);
     }
     cs_high();
-
-    // Restore SPI to 8-bit frame mode for subsequent commands
-    p.SPI1.ctlr1().modify(|_, w| w.dff().clear_bit());
 }
 
 pub fn set_window(p: &Peripherals, x: u16, y: u16, w: u16, h: u16) {

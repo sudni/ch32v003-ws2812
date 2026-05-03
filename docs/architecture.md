@@ -36,22 +36,30 @@ main()
   │     ├─ TIM1_CH1 PWM config (PSC=47, ARR=100)
   │     └─ PD2 AF-PP mode
   │
-  └─ 6. Main loop
-        └─ tft_fill_dma(color)   ← repeated every 20 ms, cycling 224 rainbow colors
-              ├─ Set window (0x2A / 0x2B / 0x2C)
-              ├─ Switch SPI to 16-bit frames (DFF=1)
-              ├─ 2 bursts of 38,400 words → spi_dma_fill16(&PIXEL)
-              ├─ Wait for SPI BSY to clear
-              └─ Restore SPI to 8-bit frames (DFF=0)
+  └─ 6. Main loop (run_demo)
+        ├─ Part 1: C64-Style Scene (run_c64_demo)
+        │     ├─ 3D Starfield (pixel-by-pixel erase/draw)
+        │     ├─ Bouncing Sprite (DMA window fill erase + DMA draw)
+        │     └─ Scrolling Text (Buffer-rendered anti-flicker block DMA)
+        ├─ Part 2: Procedural Plasma (run_plasma_demo)
+        │     ├─ Generate 256-color palette into COMMON_BUF
+        │     ├─ Row-by-row plasma calculation into COMMON_BUF
+        │     └─ Parallel CPU calculation / DMA transfer per row
+        └─ Part 3: 3D Wireframe Cube (run_cube_demo)
+              ├─ Render 3D rotation into 1-bit bitmask in COMMON_BUF
+              └─ Flicker-free expansion and row-by-row DMA transfer
 
 ## Project Structure
 
 The codebase is split into specific modules for modularity and maintainability:
 
-- `src/main.rs`: Entry point, clock setup, GPIO config, SPI init, and the main draw loop.
-- `src/ili9341.rs`: TFT control pins (`cs`, `dc`, `rst`), init sequence, and `tft_fill_dma`.
+- `src/main.rs`: Entry point, clock setup, GPIO config, SPI init, and call to `run_demo`.
+- `src/demo.rs`: Demo sequencer and implementation of Starfield, Sprite, Scroller, Plasma, and 3D Cube.
+- `src/ili9341.rs`: TFT control pins (`cs`, `dc`, `rst`), init sequence, window management, and primitive drawing.
 - `src/backlight.rs`: Backlight PWM control using TIM1_CH1 on PD2.
 - `src/spi.rs`: SPI and DMA-specific functions (`spi_dma_tx`, `spi_dma_fill16`, `spi_tx_byte`).
+- `src/assets.rs`: Graphical assets (32x32 sprite).
+- `src/font.rs`: 8x8 bitmap font.
 - `src/delay.rs`: Low-level busy-wait delay functions (`delay_us`, `delay_ms`).
 
 ## Module overview
@@ -111,8 +119,8 @@ The project is configured for advanced hardware debugging using:
 
 ```rust
 const SPI1_DATAR: u32 = 0x4001_300C;  // SPI1 base 0x4001_3000 + offset 0x0C
-const WIDTH:  u16 = 240;
-const HEIGHT: u16 = 320;
+const WIDTH:  u16 = 320;
+const HEIGHT: u16 = 240;
 
 // GPIO output registers (direct raw pointer access)
 const GPIOC_OUTDR: *mut u32 = 0x4001_100C as *mut u32;

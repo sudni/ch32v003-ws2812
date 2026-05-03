@@ -37,9 +37,10 @@ Region aliases map standard `REGION_*` symbols used by the `riscv-rt` linker scr
 
 | Symbol | Location | Size | Description |
 |--------|----------|------|-------------|
-| `.bss` / `.data` | RAM | < 100 B | Globals, Peripherals token |
+| `.bss` / `.data` | RAM | ~80 B | Globals, Peripherals token |
+| `COMMON_BUF` | RAM (.bss) | **1152 B** | Shared workspace (Characters, Palette, 1-bit Bitmask) |
 | `PIXEL` (static mut) | RAM (.bss) | **2 B** | Single pixel for DMA fills |
-| Stack | RAM (top) | up to ~1.5 KB | Call stack |
+| Stack | RAM (top) | ~800 B | Call stack |
 
 ### How we removed `ROW_BUF` (saving 480 B)
 
@@ -50,10 +51,11 @@ We optimised this by declaring a single `static mut PIXEL: u16` and configuring 
 ### RAM budget summary
 
 ```
-Total RAM:     2048 B
-PIXEL:         -   2 B   (static, .bss)
-BSS/DATA:      -  ~64 B  (runtime data)
-Available stack: ~1982 B  ✓  (sufficient for single call frame, no recursion)
+Total RAM:       2048 B
+COMMON_BUF:    - 1152 B  (static, .bss)
+PIXEL:         -    2 B  (static, .bss)
+BSS/DATA:      -  ~80 B  (runtime data)
+Available stack: ~814 B  ✓  (Sufficient for demo logic)
 ```
 
 ---
@@ -71,12 +73,12 @@ Measured section sizes (`cargo size --release -- -A`):
 |---------|------|---------|-------------|
 | `.init` | 4 B | `0x0000_0000` | Reset vector |
 | `.trap` | 240 B | `0x0000_0004` | Interrupt vector table |
-| `.text` | ~1 082 B | `0x0000_00F4` | Firmware code |
-| `.rodata` | ~168 B | `0x0000_0530` | Read-only data (constants) |
+| `.text` | ~4 400 B | `0x0000_00F4` | Firmware code |
+| `.rodata` | ~3 800 B | `0x0000_0530` | Sprites, Fonts, LUTs |
 | `.data` | 0 B | `0x2000_0000` | Initialised globals |
-| `.bss` | **~3 B** | `0x2000_0000` | Zero-init globals (incl. PIXEL) |
-| **Total Flash** | **~1.7 KB** | | of 16 KB available ✅ |
-| **Total RAM** | **~3 B** | | of 2 048 B available ✅ |
+| `.bss` | **~1 240 B** | `0x2000_0000` | Zero-init globals (COMMON_BUF, PIXEL) |
+| **Total Flash** | **~8.4 KB** | | of 16 KB available ✅ |
+| **Total RAM** | **~1 240 B** | | of 2 048 B available ✅ |
 
 > Debug symbols (`.debug_*`) add ~63 KB to the ELF file but are **not** flashed — they exist for GDB only.
 

@@ -10,4 +10,5 @@ json-target-spec = true
 runner = "wlink --chip CH32V003 flash"
 rustflags = [
     "-C", "link-arg=-Tlink.x",
+    "--emit=asm",
 ]

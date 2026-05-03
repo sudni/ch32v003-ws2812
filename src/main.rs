@@ -4,13 +4,13 @@
 use ch32v0::ch32v003::Peripherals;
 use panic_halt as _;
 
+mod assets;
 mod backlight;
 mod delay;
-mod ili9341;
-mod spi;
-mod assets;
 mod demo;
 mod font;
+mod ili9341;
+mod spi;
 
 use backlight::{init_backlight, set_backlight};
 //use delay::delay_ms;
@@ -151,7 +151,7 @@ fn main() -> ! {
             .dff()
             .clear_bit()
             .br()
-            .bits(0b000) // /2 → 24 MHz
+            .bits(0b001) // /4 → 12 MHz (more stable than 24MHz)
             .lsbfirst()
             .clear_bit()
             .spe()

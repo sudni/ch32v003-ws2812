@@ -60,69 +60,8 @@ pub fn spi_dma_tx(p: &Peripherals, buf: &[u8]) {
 
     // Wait for transfer complete (TC flag = bit 9 of INTFR)
     while p.DMA1.intfr().read().bits() & (1 << 9) == 0 {}
-}
-
-/// Repeat a single **16-bit** pixel value `count` times over SPI1 via DMA1 Ch3.
-///
-/// Key differences from `spi_dma_tx`:
-///   - PSIZE = MSIZE = 01  → 16-bit transfers (SPI DFF must be 1)
-///   - MINC  = 0           → DMA reads the *same* memory address every time
-///
-/// This lets us fill the whole screen from a single `u16` without any buffer.
-/// The SPI peripheral must already be configured for 16-bit frames (DFF=1)
-/// before calling this, and restored to 8-bit afterwards.
-/// Caller must assert CS and set DC=data beforehand.
-pub fn spi_dma_fill16(p: &Peripherals, pixel: *const u16, count: u32) {
-    if count == 0 {
-        return;
-    }
-    let dma = &p.DMA1;
-
-    // Disable channel before reconfiguring
-    dma.cfgr3().modify(|_, w| w.en().clear_bit());
-
-    // Clear all interrupt flags for ch3
-    dma.intfcr().write(|w| unsafe { w.bits(0x0F00) });
-
-    // Peripheral address → SPI1 data register
-    dma.paddr3().write(|w| unsafe { w.bits(SPI1_DATAR) });
-
-    // Memory address → the single pixel variable
-    dma.maddr3().write(|w| unsafe { w.bits(pixel as u32) });
-
-    // Transfer count (number of 16-bit words)
-    dma.cntr3().write(|w| unsafe { w.bits(count) });
-
-    // Configure channel:
-    //   DIR=1   memory→peripheral
-    //   MINC=0  fixed source address (repeat same pixel)
-    //   PINC=0  peripheral address fixed
-    //   PSIZE=01 (16-bit)  MSIZE=01 (16-bit)
-    //   PL=10   high priority
-    //   CIRC=0  one-shot
-    dma.cfgr3().write(|w| unsafe {
-        w.dir()
-            .set_bit() // mem→periph
-            .minc()
-            .clear_bit() // ← fixed: no memory increment
-            .pinc()
-            .clear_bit()
-            .psize()
-            .bits(0b01) // 16-bit peripheral
-            .msize()
-            .bits(0b01) // 16-bit memory
-            .pl()
-            .bits(0b10) // high priority
-            .circ()
-            .clear_bit()
-            .mem2mem()
-            .clear_bit()
-            .en()
-            .set_bit()
-    });
-
-    // Wait for transfer complete (TC flag = bit 9 of INTFR)
-    while p.DMA1.intfr().read().bits() & (1 << 9) == 0 {}
+    // Wait for SPI to finish shifting out the last byte
+    while p.SPI1.statr().read().bsy().bit_is_set() {}
 }
 
 // ── Low-level SPI (blocking, no DMA) for short commands ──────────────────────
