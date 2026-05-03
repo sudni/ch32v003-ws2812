@@ -1,12 +1,12 @@
 use crate::delay::delay_ms;
 
-use crate::spi::{spi_dma_fill16, spi_tx_byte};
+use crate::spi::{spi_dma_fill16, spi_dma_tx, spi_tx_byte};
 use ch32v0::ch32v003::Peripherals;
 use core::ptr;
 
 // Screen resolution
-pub const WIDTH: u16 = 240;
-pub const HEIGHT: u16 = 320;
+pub const WIDTH: u16 = 320;
+pub const HEIGHT: u16 = 240;
 
 // ── GPIO helpers ──────────────────────────────────────────────────────────────
 #[inline(always)]
@@ -93,14 +93,14 @@ pub fn tft_init(p: &Peripherals) {
     // Pixel format: 16-bit (RGB565)
     tft_cmd_data(p, 0x3A, &[0x55]);
 
-    // Memory access control: row/col order, BGR
-    tft_cmd_data(p, 0x36, &[0x48]);
+    // Memory access control: row/col order, BGR (Landscape)
+    tft_cmd_data(p, 0x36, &[0x28]);
 
-    // Column address set: 0..239
-    tft_cmd_data(p, 0x2A, &[0x00, 0x00, 0x00, 0xEF]);
+    // Column address set: 0..319
+    tft_cmd_data(p, 0x2A, &[0x00, 0x00, 0x01, 0x3F]);
 
-    // Row address set: 0..319
-    tft_cmd_data(p, 0x2B, &[0x00, 0x00, 0x01, 0x3F]);
+    // Row address set: 0..239
+    tft_cmd_data(p, 0x2B, &[0x00, 0x00, 0x00, 0xEF]);
 
     // Display on
     tft_cmd(p, 0x29);
@@ -110,8 +110,8 @@ pub fn tft_init(p: &Peripherals) {
 // ── Fill screen with a solid RGB565 colour using DMA ─────────────────────────
 pub fn tft_fill_dma(p: &Peripherals, color: u16) {
     // Set write window to full screen
-    tft_cmd_data(p, 0x2A, &[0x00, 0x00, 0x00, 0xEF]); // column 0-239
-    tft_cmd_data(p, 0x2B, &[0x00, 0x00, 0x01, 0x3F]); // row 0-319
+    tft_cmd_data(p, 0x2A, &[0x00, 0x00, 0x01, 0x3F]); // column 0-319
+    tft_cmd_data(p, 0x2B, &[0x00, 0x00, 0x00, 0xEF]); // row 0-239
 
     // Begin pixel write
     tft_cmd(p, 0x2C);
@@ -140,4 +140,29 @@ pub fn tft_fill_dma(p: &Peripherals, color: u16) {
 
     // Restore SPI to 8-bit frame mode for subsequent commands
     p.SPI1.ctlr1().modify(|_, w| w.dff().clear_bit());
+}
+
+pub fn set_window(p: &Peripherals, x: u16, y: u16, w: u16, h: u16) {
+    let x2 = x + w - 1;
+    let y2 = y + h - 1;
+    tft_cmd_data(p, 0x2A, &[(x >> 8) as u8, x as u8, (x2 >> 8) as u8, x2 as u8]);
+    tft_cmd_data(p, 0x2B, &[(y >> 8) as u8, y as u8, (y2 >> 8) as u8, y2 as u8]);
+    tft_cmd(p, 0x2C);
+}
+
+pub fn tft_draw_sprite(p: &Peripherals, x: u16, y: u16, w: u16, h: u16, data: &[u8]) {
+    set_window(p, x, y, w, h);
+    dc_data();
+    cs_low();
+    spi_dma_tx(p, data);
+    cs_high();
+}
+
+pub fn tft_draw_pixel(p: &Peripherals, x: u16, y: u16, color: u16) {
+    set_window(p, x, y, 1, 1);
+    dc_data();
+    cs_low();
+    spi_tx_byte(p, (color >> 8) as u8);
+    spi_tx_byte(p, color as u8);
+    cs_high();
 }

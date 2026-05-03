@@ -10,13 +10,14 @@
 |----------------|-------------|-----------|-----------|-------------|
 | **VCC** | 3.3 V supply | — | — | Power (3.3 V only — do NOT use 5 V) |
 | **GND** | GND | — | — | Common ground |
-| **CS** | **PC1** | OUT | Push-pull 10 MHz | Chip-select (active LOW, software controlled) |
-| **RESET** | **PD4** | OUT | Push-pull 10 MHz | Hardware reset (active LOW) |
-| **DC/RS** | **PD3** | OUT | Push-pull 10 MHz | Data/Command select (HIGH=data, LOW=command) |
-| **SDI/MOSI** | **PC6** | OUT | AF push-pull 50 MHz | SPI1 MOSI |
-| **SCK** | **PC5** | OUT | AF push-pull 50 MHz | SPI1 clock |
-| **LED** | **PD2** | OUT | AF push-pull 50 MHz | Backlight PWM (TIM1_CH1) |
-| **SDO/MISO** | NC | — | — | Not connected (write-only driver) |
+| **Crystal (X1)**| **PA1 / PA2**| IN/OUT | Analog      | 24 MHz External Crystal for 48 MHz Clock |
+| **CS**         | **PC1**      | OUT    | Push-pull   | Chip-select (active LOW) |
+| **RESET**      | **PD4**      | OUT    | Push-pull   | Hardware reset (active LOW) |
+| **DC/RS**      | **PD3**      | OUT    | Push-pull   | Data/Command select (H=data, L=cmd) |
+| **SDI/MOSI**   | **PC6**      | OUT    | AF-PP       | SPI1 MOSI |
+| **SCK**        | **PC5**      | OUT    | AF-PP       | SPI1 clock |
+| **LED**        | **PD2**      | OUT    | AF-PP       | Backlight PWM (TIM1_CH1) |
+| **SDO/MISO**   | NC           | —      | —           | Not connected (write-only) |
 
 > **Note:** The QVGA 2.2″ module has a 9-pin header.  
 > Pin 1 is typically **VCC** and pin 9 is **SDO/MISO** — confirm with your board's silkscreen.
@@ -40,8 +41,8 @@
      PD5       ──┤ 2     19 ├── PC6 (MOSI)  ← SPI1_MOSI
      PD6       ──┤ 3     18 ├── PC7
      PD7       ──┤ 4     17 ├── PC1 (CS)
-     PA1/NRST  ──┤ 5     16 ├── PC2
-     PA2       ──┤ 6     15 ├── PC3
+     PA1 (OSCI)──┤ 5     16 ├── PC2         ← 24MHz Crystal (X1)
+     PA2 (OSCO)──┤ 6     15 ├── PC3         ← 24MHz Crystal (X1)
      VSS (GND) ──┤ 7     14 ├── PC4
      PD1/SWDIO ──┤ 8     13 ├── PD0
      PD2 (LED) ──┤ 9     12 ├── VDD (3.3V)
@@ -49,6 +50,44 @@
                  └──────────┘
 ```
 > Pin numbers vary by package variant — always verify against your datasheet.
+ 
+## Schematic Diagram (Logical)
+ 
+```mermaid
+graph LR
+    subgraph MCU ["CH32V003 (48 MHz)"]
+        PC1["PC1 (CS)"]
+        PC5["PC5 (SCK)"]
+        PC6["PC6 (MOSI)"]
+        PD2["PD2 (PWM)"]
+        PD3["PD3 (DC)"]
+        PD4["PD4 (RST)"]
+        PA1["PA1 (OSC_IN)"]
+        PA2["PA2 (OSC_OUT)"]
+    end
+ 
+    subgraph TFT ["ILI9341 2.2' TFT"]
+        T_CS["CS"]
+        T_SCK["SCK"]
+        T_MOSI["SDI"]
+        T_LED["LED"]
+        T_DC["DC/RS"]
+        T_RST["RESET"]
+    end
+ 
+    subgraph Clock ["External Clock"]
+        Crystal["24 MHz Crystal"]
+    end
+ 
+    PC1 --> T_CS
+    PC5 --> T_SCK
+    PC6 --> T_MOSI
+    PD2 --> T_LED
+    PD3 --> T_DC
+    PD4 --> T_RST
+    PA1 --- Crystal
+    PA2 --- Crystal
+```
 
 ## Electrical considerations
 
